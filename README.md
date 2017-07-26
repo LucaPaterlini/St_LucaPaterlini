@@ -28,7 +28,7 @@ with a unique id for each user and an unique id for
 each item.
 I've assumed that the access controll was not part of this task.
 I've stored the value using a integer an representing the value in
-pennyes to not create errors due to the nature of the representation
+pennies to not create errors due to the nature of the representation
 of the floating point.
 I've developed this task using echo framework and gogland as IDE
 
