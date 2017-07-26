@@ -1,5 +1,26 @@
 ## Disclaimer
 
+In order to run the serivice without compiling
+```
+go run api.go
+```
+In oder to run the service compiling the sourcode before
+```
+go build api.go
+./api
+```
+Once the service is running use 
+```
+go test
+```
+inside the main folder to run the end to end tests
+
+use the same command inside the lib folter
+to run the unittests
+
+
+## Disclaimer
+
 Due to to specific goal of this task I've kept all the informations
 inside local structures instead of using a database.
 I've assumed that a list of users and items has been previously creted
