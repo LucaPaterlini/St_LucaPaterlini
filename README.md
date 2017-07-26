@@ -1,4 +1,4 @@
-## Disclaimer
+## Instructions
 
 In order to run the serivice without compiling
 ```
