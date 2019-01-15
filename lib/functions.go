@@ -1,69 +1,86 @@
 package lib
 
-import ("time";"sync"
-	"encoding/json"
+import (
+	"../schema"
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"time"
 )
 
 
-type Bid_item struct{
-	User_id string
-	Value int64
-	Time int64
-}
 
-var bid_dict = map[string][]Bid_item{}
-var user_dict = map[string]map[string]bool{}
-
-var len_bid_dict= map[string]int64{}
-var len_user_dict= map[string]int64{}
-var critical_section sync.Mutex
-
-
-
+var bidDict = map[string][]schema.BidRecord{}
+var userDict = map[string]*schema.User{}
+var sema = make(chan int,1)
 // Record a user's bid on an item, each new bid must be at a higher price than before
-func Bid(user_id, item_id string,  value int64)int64{
+func Bid(userId, itemId string,  value int64)(result int64,err error){
+	// checking the existence of the user
+	if _, ok := userDict[userId]; !ok {err = errors.New("user not found");return }
+	if _, ok := bidDict[itemId]; !ok {err = errors.New("item not found");return }
 
-	if bid_dict[item_id]!= nil && bid_dict[item_id][len_bid_dict[item_id]-1].Value>=value{ return -1}
+	lastVal := bidDict[itemId][len(bidDict[itemId])-1].Value
+	// lock
+	sema<- 1
 
-	tmp_item :=Bid_item{user_id,value,int64(time.Now().UnixNano())}
-
-	critical_section.Lock() // critical section start
-
-	bid_dict[item_id] = append(bid_dict[item_id], tmp_item)
-	len_bid_dict[item_id]+=1
-
-	if len_user_dict[user_id]>0{
-		user_dict[user_id][item_id] =  true
-	} else{
-		user_dict[user_id] = map[string]bool{item_id:true}
+	if lastVal>= value {err = errors.New("the offer is to low for "+itemId+ " require at least: "+string(lastVal));return}
+	if bidDict[itemId][len(bidDict[itemId])-1].UserId==userId{
+		err = errors.New("this bid overbid the bid of the same user")
+		result = lastVal
+		return
 	}
-	len_user_dict[user_id]+=1
-
-	critical_section.Unlock() // critical section ends
-	return len_bid_dict[item_id]
+	// add the bid
+	t := time.Now().UnixNano()
+	newBidtmp := schema.UserBidRecord{Value:value,Time:t,ItemId:itemId}
+	item := schema.BidRecord{UserId:userId,Value:value,Time:t}
+	bidDict[itemId]= append(bidDict[itemId],item)
+	userDict[userId].Bids =append(userDict[userId].Bids,newBidtmp)
+	result= bidDict[itemId][len(bidDict[itemId])-1].Value
+	// unlock
+	<-sema
+	return
 }
 
 // Get the current winning bid for an item
-func Winning(item_id string)int64{
-	if len_bid_dict[item_id] !=0 {
-		return bid_dict[item_id][len_bid_dict[item_id]-1].Value
+func Winning(itemId string)(item schema.BidRecord,err error){
+	if val,ok:=bidDict[itemId];ok{
+		item = val[len(bidDict[itemId])-1]
+	}else {
+		err = errors.New("item not found")
 	}
-	return -1
-}
-// Get all the bids for an item
-func All_bids(item_id string)string{
-	if len_bid_dict[item_id] !=0 {
-		json_return, _ := json.Marshal(bid_dict[item_id])
-		return string(json_return)
-	}
-	return "[]"
+	return
 }
 
+// Get all the bids for an item
+func AllBids(itemId string)(array []schema.BidRecord,err error){
+	if val,ok:=bidDict[itemId];ok{
+		array = val
+	}else {
+		err = errors.New("item not found")
+	}
+	return
+}
+
+
 //Get all the items on which a user has bid
-func User_bids(user_id string)string{
-	if len_user_dict[user_id] == 0 {return "[]"}
-	keys := []string{}
-	for k := range user_dict[user_id] {keys = append(keys, k)}
-	json_return, _ := json.Marshal(keys)
-	return string(json_return)
+func UserBids(userId string)(userItems[]schema.UserBidRecord,err error){
+	if user, ok := userDict[userId]; ok {
+		userItems = user.Bids
+	}else {
+	err = errors.New("user not found")
+	}
+	return
+}
+
+// create a user
+func CreteUser(name,surname string,dob int64)(userId string, err error){
+	h := sha256.New()
+	if _,ok:=userDict[userId];ok{
+		err = errors.New("user already inserted")
+		return
+	}
+	h.Write([]byte(name+surname+string(dob)))
+	userId =fmt.Sprintf("%x", h.Sum(nil))
+	userDict[userId]=&schema.User{Name:name,Surname:surname,DateOfBirth:dob,Bids:nil}
+	return
 }

@@ -2,115 +2,55 @@ package lib
 
 import (
 	"testing"
-	"encoding/json"
 )
 
-// Checks the effects of the new bid
-func TestBidNew(t *testing.T) {
-	Bid("1","pony",5)
-	if len_bid_dict["pony"]!=1 ||
-		bid_dict["pony"][0].Value!=5 ||
-		bid_dict["pony"][0].User_id!="1" {
-		t.Error("Error inserting a new Bid\n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][0].Value,
-			", user_id:",bid_dict["pony"][0].User_id)}
+
+func TestAll(t *testing.T) {
+	// check add for no user available
+	val, err :=Bid("random1","banana",12)
+	if err!=nil {t.Error(err.Error())}
+	if val!=0{t.Error("Wrong highest offer value, expected 0, got:",val)}
+	// create users
+	idLuca,err :=CreteUser("luca","paterlini",111111111)
+	if err!=nil {t.Error(err.Error())}
+	idMario,err :=CreteUser("mario","paganino",666)
+	if err!=nil {t.Error(err.Error())}
+	// start the bidding process
+	val, err =Bid(idLuca,"banana",1)
+	if err!=nil {t.Error(err.Error())}
+	val, err =Bid(idLuca,"banana",11)
+	if err==nil {t.Error("Expected and Overbid error")}
+	val, err =Bid(idMario,"banana",1)
+	if err==nil {t.Error("Expeted a low value bid error")}
+	val, err =Bid(idMario,"banana",12)
+
+	if err!=nil {t.Error(err.Error())}
+	val, err =Bid(idLuca,"apple",666)
+
+	if err!=nil {t.Error(err.Error())}
+	//retrieving the winning
+	item,err := Winning("banana")
+	if err!=nil || item.Value!=12 {t.Error(err.Error())}
+
+	// compare the list of the bid
+	listValue := []int64{1,11,12}
+	listBiders := []string{idLuca,idMario}
+	arrayBids,err := AllBids("banana")
+	if err!=nil {t.Error(err.Error())}
+	for i,v := range arrayBids {
+		if v.Value!=listValue[i] || v.UserId!=listBiders[i]{
+			t.Error("ArrayBids: wrong item values",v)
+		}
+	}
+	// checks the bids of a specific user
+	listUserBidsItems :=[]string{"banana","apple"}
+	listUserBidsValue :=[]int64{1,666}
+	arrayBidsUser,err := UserBids(idLuca)
+	if err!=nil {t.Error(err.Error())}
+	for i,v := range arrayBidsUser {
+		if v.Value!=listUserBidsValue[i] || v.ItemId!=listUserBidsItems[i]{
+			t.Error("arrayBidsUser: wrong item values",v)
+		}
+	}
 }
 
-// Checks the effects of a lower bid
-func TestBidLower(t *testing.T) {
-	Bid("1","pony",4)
-	if len_bid_dict["pony"]!=1 ||
-		bid_dict["pony"][0].Value!=5 ||
-		bid_dict["pony"][0].User_id!="1" {
-		t.Error("Error inserting a new Bid\n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][0].Value,
-			", user_id:",bid_dict["pony"][0].User_id)}
-}
-
-// Check the effects of the second bid
-func TestBidSecondUserSameItemSame(t *testing.T) {
-	Bid("1","pony",10)
-	if bid_dict["pony"][len_bid_dict["pony"]-1].Value!=10 {
-		t.Error("Error inserting a second Bid same user same item\n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][len_bid_dict["pony"]-1].Value,
-			", user_id:",bid_dict["pony"][len_bid_dict["pony"]-1].User_id)}
-}
-
-// Check the effect of the third bid made by a different user
-func TestBidThirdUserDifferentItemSame(t *testing.T) {
-	Bid("2","pony",20)
-	if bid_dict["pony"][len_bid_dict["pony"]-1].Value!=20 ||
-		bid_dict["pony"][len_bid_dict["pony"]-1].User_id!="2"{
-		t.Error("Error inserting a third Bid different user same item\n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][len_bid_dict["pony"]-1].Value,
-			", user_id:",bid_dict["pony"][len_bid_dict["pony"]-1].User_id)}
-}
-
-// Check the Insert of an offer for another item
-func TestBidItemDifferent(t *testing.T) {
-	Bid("1","dog",3)
-	if  len_bid_dict["dog"]!=1 ||
-	  bid_dict["dog"][len_bid_dict["dog"]-1].Value!=3 ||
-		bid_dict["dog"][len_bid_dict["dog"]-1].User_id!="1"{
-		t.Error("Error inserting a new Bid for a new Item\n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][len_bid_dict["pony"]-1].Value,
-			", user_id:",bid_dict["pony"][len_bid_dict["pony"]-1].User_id)}
-}
-
-// Check the best Bid for a not existing item
-func TestWinningItemNotExists(t *testing.T){
-	if Winning("Cthulhu")!=-1{
-		t.Error("Error inserting an item that doesn't exists\n"+
-			"  len:",len_bid_dict["Cthulhu"],
-			", value:",bid_dict["Cthulhu"][len_bid_dict["Cthulhu"]-1].Value,
-			", user_id:",bid_dict["Cthulhu"][len_bid_dict["Cthulhu"]-1].User_id)}
-}
-
-// Check the best Bid for an existing item
-func TestWinningItemExists(t *testing.T){
-	if Winning("pony")!=20{
-		t.Error("Error inserting an item that have to exist \n"+
-			"  len:",len_bid_dict["pony"],
-			", value:",bid_dict["pony"][len_bid_dict["pony"]-1].Value,
-			", user_id:",bid_dict["pony"][len_bid_dict["pony"]-1].User_id)}
-}
-
-// Check the the previus bids for an existing item
-func TestAllBids(t *testing.T){
-
-	s:=All_bids("pony")
-	var jsonBlob = []byte(s)
-	var bids_array []Bid_item
-
-	err := json.Unmarshal(jsonBlob, &bids_array)
-
-	if err != nil {t.Error("Error while getting the pony's bids")}
-	if !(bids_array[0].Value < bids_array[1].Value ||
-		bids_array[1].Value  < bids_array[2].Value) {t.Error("Wrong bid's order")}
-}
-
-// Check the previous bids for a not existing item
-func TestAllBids_NoItem(t *testing.T){
-	s:=All_bids("crocodile")
-	if s!="[]"{t.Error("Unexpected element inside the test of an empty bids list")}
-
-}
-
-// Check the list of items wich a user have made a bid
-func TestUserBids(t *testing.T){
-	s:=User_bids("1")
-	comparison := `["pony","dog"]`
-	if s=="null"  {t.Error("no Bids available for the user wich id is 1")}
-	if s != comparison{t.Error("wrong list of items")}
-}
-
-// Check the list of items wich a user have made a bid for a user that not made any bid
-func TestUserBids_NoItem(t *testing.T){
-	s:=User_bids("666")
-	if s!="[]"{t.Error("Unexpected element inside the list of items")}
-}
