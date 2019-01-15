@@ -2,11 +2,11 @@
 
 In order to run the serivice without compiling
 ```
-go run api.go
+go run main.go
 ```
 In oder to run the service compiling the sourcode before
 ```
-go build api.go
+go build main.go
 ./api
 ```
 Once the service is running use 
@@ -26,3 +26,7 @@ This is a skill showcase of my golang only skill:
  - I have used global structures instead that will vanish at the end at the end of the
    of the instance that is running this code
  - To handle the api calls I have used the library fasthttp
+ 
+ ##TODO
+ 
+ Add more tests coverage
